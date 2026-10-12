@@ -1,0 +1,55 @@
+services:
+  mysql-db:
+    image: mysql:8.0
+    container_name: mysql-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: test_db
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./DevOps-AppGestionDesProjets
+      dockerfile: ../backend.Dockerfile
+    container_name: backend
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/test_db?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${DB_ROOT_PASSWORD}
+    ports:
+      - "8085:8080"
+    restart: on-failure
+    networks:
+      - app-net
+
+  frontend:
+    build:
+      context: ./DevOps-AppGestionDesProjets
+      dockerfile: ../frontend.Dockerfile
+      args:
+        API_URL: http://192.168.33.10:8085
+    container_name: frontend
+    depends_on:
+      - backend
+    ports:
+      - "8083:80"
+    networks:
+      - app-net
+
+volumes:
+  mysql-data:
+
+networks:
+  app-net:
+    driver: bridge
